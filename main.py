@@ -143,7 +143,7 @@ def build_week_view(week_offset):
             raw_start = start.hour + start.minute / 60
             raw_end = (end.hour + end.minute / 60) if end is not None else raw_start + 1
             if raw_end <= HOUR_START or raw_start >= HOUR_END:
-                summary = str(event.get("SUMMARY", "Sin título"))
+                summary = str(event.get("SUMMARY", "Untitled"))
                 start_label = start.strftime("%H:%M")
                 end_label = end.strftime("%H:%M") if end is not None else ""
                 time_range = f"{start_label}-{end_label}" if end_label else start_label
@@ -256,7 +256,7 @@ def build_week_view(week_offset):
             end = event_end(event)
             start_label = event_start(event).strftime("%H:%M")
             end_label = end.strftime("%H:%M") if end is not None else ""
-            summary = str(event.get("SUMMARY", "Sin título"))
+            summary = str(event.get("SUMMARY", "Untitled"))
             events_html += f'''
             <div style="position:absolute; top:{top}px; height:{height}px; left:calc({left_pct}% + 1px); width:calc({col_width_pct}% - 2px);
                         background:#eee; border:1px solid #000; border-radius:2px; padding:1px 3px;
@@ -350,14 +350,14 @@ def build_month_view(month_offset):
                 fingerprint_parts.append(f"T|{start}|{summary}")
 
             # %-d is not supported by strftime on Windows, so date.day is used instead
-            day_label = f"{date.day} de {date.strftime('%b')}" if date.day == 1 else str(date.day)
+            day_label = f"{date.day} {date.strftime('%b')}" if date.day == 1 else str(date.day)
 
             items_html = ""
             for event in all_day_events:
                 summary = str(event.get("SUMMARY", ""))
                 items_html += f'<div style="background:#000; color:#fff; font-size:12px; line-height:13px; padding:0 2px; margin-bottom:1px; border-radius:1px; box-sizing:border-box; overflow:hidden; white-space:nowrap;">{summary}</div>'
             for event in timed_events:
-                summary = str(event.get("SUMMARY", "Sin título"))
+                summary = str(event.get("SUMMARY", "Untitled"))
                 start_label = event_start(event).strftime("%H:%M")
                 items_html += f'<div style="font-size:12px; line-height:13px; color:#000; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">&bull; {start_label} {summary}</div>'
 

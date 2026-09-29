@@ -22,6 +22,8 @@ sized for the 7.5" display (800×480): the current week, the next week and the f
   [Customizing the week grid](#customizing-the-week-grid).
 - **Month view** shows the full weeks that overlap the month.
 - Times are shown in `TRMNL_TZ`, whatever timezone the calendar uses.
+- The text on the screen is in English. Weekday and month names come from `TRMNL_LOCALE`, so leave
+  it unset to get English names or set it to show them in another language.
 - The script only pushes a view when its content changed since the last successful push
   (fingerprints are stored in `.push_state.json`), see
   [Change detection and forcing a resend](#change-detection-and-forcing-a-resend). The small
