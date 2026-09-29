@@ -58,8 +58,8 @@ STYLE_RESET = '<style>* { margin:0; padding:0; box-sizing:border-box; -webkit-fo
 
 
 def to_local(value):
-    # Los datetimes con zona (p. ej. eventos en UTC) se pasan a trmnl_tz; las fechas
-    # de día completo y los datetimes sin zona (hora flotante) se dejan tal cual.
+    # Datetimes with a timezone (e.g. UTC events) are converted to trmnl_tz; all-day dates
+    # and datetimes without a timezone (floating time) are left as they are.
     if isinstance(value, datetime.datetime) and value.tzinfo is not None:
         return value.astimezone(local_tz)
     return value
@@ -79,10 +79,10 @@ def event_end(event):
 
 
 def events_on(date):
-    # query.at(date) interpreta el día en UTC, así que un evento a las 00:30 locales
-    # caería en el día anterior. Los eventos con hora se consultan por el rango del día
-    # en trmnl_tz; los de día completo no dependen de la zona y se consultan por fecha
-    # (con rango con zona, el día del cambio de hora arrastraría el del día siguiente).
+    # query.at(date) reads the day in UTC, so an event at 00:30 local time would land on the
+    # previous day. Timed events are queried by the range of the day in trmnl_tz; all-day
+    # events do not depend on the timezone and are queried by date (with a timezone-aware
+    # range, the day of the DST change would pull in the all-day event of the following day).
     day_start = local_tz.localize(datetime.datetime.combine(date, datetime.time.min))
     day_end = local_tz.localize(datetime.datetime.combine(date + datetime.timedelta(days=1), datetime.time.min))
     all_day_events = [event for event in query.at(date) if is_all_day(event)]
@@ -91,8 +91,8 @@ def events_on(date):
 
 
 def event_sort_key(event):
-    # Clave estable para ordenar eventos entre ejecuciones distintas del script,
-    # ya que query.between() no garantiza el mismo orden en cada proceso.
+    # Stable key to sort events across different runs of the script,
+    # since query.between() does not guarantee the same order in every process.
     end = event_end(event)
     start_key = event_start(event).isoformat()
     end_key = end.isoformat() if end is not None else ""
@@ -349,7 +349,7 @@ def build_month_view(month_offset):
                 summary = str(event.get("SUMMARY", ""))
                 fingerprint_parts.append(f"T|{start}|{summary}")
 
-            # %-d no existe en strftime de Windows, por eso se usa date.day
+            # %-d is not supported by strftime on Windows, so date.day is used instead
             day_label = f"{date.day} de {date.strftime('%b')}" if date.day == 1 else str(date.day)
 
             items_html = ""
@@ -384,18 +384,18 @@ targets = []
 week_current_url = os.getenv('TRMNL_WEBHOOK_URL_WEEK_CURRENT')
 if week_current_url:
     markup, fingerprint = build_week_view(0)
-    targets.append(("semana actual", week_current_url, markup, fingerprint))
+    targets.append(("current week", week_current_url, markup, fingerprint))
 week_next_url = os.getenv('TRMNL_WEBHOOK_URL_WEEK_NEXT')
 if week_next_url:
     markup, fingerprint = build_week_view(1)
-    targets.append(("semana siguiente", week_next_url, markup, fingerprint))
+    targets.append(("next week", week_next_url, markup, fingerprint))
 month_url = os.getenv('TRMNL_WEBHOOK_URL_MONTH')
 if month_url:
     markup, fingerprint = build_month_view(0)
-    targets.append(("mes", month_url, markup, fingerprint))
+    targets.append(("month", month_url, markup, fingerprint))
 
 if DEBUG and not targets:
-    print("No hay ningún TRMNL_WEBHOOK_URL_* configurado en .env")
+    print("No TRMNL_WEBHOOK_URL_* is set in .env")
 
 state = load_state()
 state_changed = False
@@ -403,7 +403,7 @@ state_changed = False
 for name, url, markup, fingerprint in targets:
     if state.get(name) == fingerprint:
         if DEBUG:
-            print(f"--- {name}: sin cambios, no se envía ---")
+            print(f"--- {name}: no changes, not sending ---")
         continue
 
     if DEBUG:

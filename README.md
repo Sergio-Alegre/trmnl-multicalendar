@@ -23,8 +23,9 @@ sized for the 7.5" display (800×480): the current week, the next week and the f
 - **Month view** shows the full weeks that overlap the month.
 - Times are shown in `TRMNL_TZ`, whatever timezone the calendar uses.
 - The script only pushes a view when its content changed since the last successful push
-  (fingerprints are stored in `.push_state.json`). The small date/time in the week view is therefore
-  the time of the last push, not of the last check.
+  (fingerprints are stored in `.push_state.json`), see
+  [Change detection and forcing a resend](#change-detection-and-forcing-a-resend). The small
+  date/time in the week view is therefore the time of the last push, not of the last check.
 
 The views use the whole screen, so they only work with the **Full** layout. The half and quadrant
 mashup layouts are not supported.
@@ -50,10 +51,13 @@ python -m venv .venv
 
 ## Change detection and forcing a resend
 
-A view is only sent when its content changed since the last successful push. The script keeps a
-fingerprint of each view in `.push_state.json`, next to `main.py`, under the keys `semana actual`,
-`semana siguiente` and `mes`. The fingerprint is built from the dates and the events shown, not from
-the layout.
+A view is only sent when its content changed since the last successful push. This is deliberate:
+while nothing is pushed, a server such as LaraPaper keeps serving the image it already has in cache,
+so the screen updates faster than if the view had to be rendered again on every run.
+
+The script keeps a fingerprint of each view in `.push_state.json`, next to `main.py`, under the keys
+`current week`, `next week` and `month`. The fingerprint is built from the dates and the events
+shown, not from the layout.
 
 This has two consequences:
 
