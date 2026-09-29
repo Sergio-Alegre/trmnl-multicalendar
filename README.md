@@ -24,9 +24,16 @@ TRMNL_NUMBER_COLUMNS=5
 5. Run `main.py`
 
 
-## Créditos
+## Credits
 
-Este proyecto es un fork de [jfsso/trmnl-calendar](https://github.com/jfsso/trmnl-calendar),
-publicado bajo licencia MIT. Ha evolucionado por separado, con soporte para varios
-calendarios de Google, actualización solo cuando hay cambios y adaptación a LaraPaper.
-Se conserva el aviso de copyright y la licencia originales (ver `LICENSE`).
+This project is a fork of [jfsso/trmnl-calendar](https://github.com/jfsso/trmnl-calendar),
+released under the MIT License. It has since been developed independently and is not
+intended to be merged back upstream.
+
+Main changes from the original:
+
+- Weekly view redesigned to fit the display limits of the TRMNL 7.5" DIY Kit.
+- Display logic changed to show the natural calendar week.
+- Support for generating separate plugins for the next week and the full month view.
+
+The original copyright notice and license are preserved in [LICENSE](LICENSE).
