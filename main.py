@@ -19,7 +19,8 @@ trmnl_locale = os.getenv('TRMNL_LOCALE')
 if trmnl_locale:
     locale.setlocale(locale.LC_ALL, trmnl_locale)
 
-now = datetime.datetime.now(pytz.timezone(trmnl_tz))
+local_tz = pytz.timezone(trmnl_tz)
+now = datetime.datetime.now(local_tz)
 
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.push_state.json')
 
@@ -56,11 +57,45 @@ query = recurring_ical_events.of(merged_calendar)
 STYLE_RESET = '<style>* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:none; text-rendering:optimizeSpeed; }</style>'
 
 
+def to_local(value):
+    # Los datetimes con zona (p. ej. eventos en UTC) se pasan a trmnl_tz; las fechas
+    # de día completo y los datetimes sin zona (hora flotante) se dejan tal cual.
+    if isinstance(value, datetime.datetime) and value.tzinfo is not None:
+        return value.astimezone(local_tz)
+    return value
+
+
+def is_all_day(event):
+    start = event["DTSTART"].dt
+    return isinstance(start, datetime.date) and not isinstance(start, datetime.datetime)
+
+
+def event_start(event):
+    return to_local(event["DTSTART"].dt)
+
+
+def event_end(event):
+    return to_local(event["DTEND"].dt) if "DTEND" in event else None
+
+
+def events_on(date):
+    # query.at(date) interpreta el día en UTC, así que un evento a las 00:30 locales
+    # caería en el día anterior. Los eventos con hora se consultan por el rango del día
+    # en trmnl_tz; los de día completo no dependen de la zona y se consultan por fecha
+    # (con rango con zona, el día del cambio de hora arrastraría el del día siguiente).
+    day_start = local_tz.localize(datetime.datetime.combine(date, datetime.time.min))
+    day_end = local_tz.localize(datetime.datetime.combine(date + datetime.timedelta(days=1), datetime.time.min))
+    all_day_events = [event for event in query.at(date) if is_all_day(event)]
+    timed_events = [event for event in query.between(day_start, day_end) if not is_all_day(event)]
+    return all_day_events + timed_events
+
+
 def event_sort_key(event):
     # Clave estable para ordenar eventos entre ejecuciones distintas del script,
-    # ya que query.at(date) no garantiza el mismo orden en cada proceso.
-    start_key = event["DTSTART"].dt.isoformat()
-    end_key = event["DTEND"].dt.isoformat() if "DTEND" in event else ""
+    # ya que query.between() no garantiza el mismo orden en cada proceso.
+    end = event_end(event)
+    start_key = event_start(event).isoformat()
+    end_key = end.isoformat() if end is not None else ""
     summary = str(event.get("SUMMARY", ""))
     uid = str(event.get("UID", ""))
     return (start_key, end_key, summary, uid)
@@ -91,12 +126,11 @@ def build_week_view(week_offset):
     day_heights = []
     fingerprint_parts = []
     for date in dates:
-        events = query.at(date)
+        events = events_on(date)
         all_day_events = []
         timed_events = []
         for event in events:
-            all_day = isinstance(event["DTSTART"].dt, datetime.date) and not isinstance(event["DTSTART"].dt, datetime.datetime)
-            if all_day:
+            if is_all_day(event):
                 all_day_events.append(event)
             else:
                 timed_events.append(event)
@@ -105,12 +139,13 @@ def build_week_view(week_offset):
         offhour_badges = []
         grid_events = []
         for event in timed_events:
-            raw_start = event["DTSTART"].dt.hour + event["DTSTART"].dt.minute / 60
-            raw_end = (event["DTEND"].dt.hour + event["DTEND"].dt.minute / 60) if "DTEND" in event else raw_start + 1
+            start, end = event_start(event), event_end(event)
+            raw_start = start.hour + start.minute / 60
+            raw_end = (end.hour + end.minute / 60) if end is not None else raw_start + 1
             if raw_end <= HOUR_START or raw_start >= HOUR_END:
                 summary = str(event.get("SUMMARY", "Sin título"))
-                start_label = event["DTSTART"].dt.strftime("%H:%M")
-                end_label = event["DTEND"].dt.strftime("%H:%M") if "DTEND" in event else ""
+                start_label = start.strftime("%H:%M")
+                end_label = end.strftime("%H:%M") if end is not None else ""
                 time_range = f"{start_label}-{end_label}" if end_label else start_label
                 offhour_badges.append((summary, time_range))
             else:
@@ -123,10 +158,11 @@ def build_week_view(week_offset):
         fingerprint_parts.extend(sorted(allday_badges))
         fingerprint_parts.extend(sorted(f"{summary}|{time_range}" for summary, time_range in offhour_badges))
         for event in sorted(grid_events, key=event_sort_key):
-            start = event["DTSTART"].dt.isoformat()
-            end = event["DTEND"].dt.isoformat() if "DTEND" in event else ""
+            end = event_end(event)
+            start_key = event_start(event).isoformat()
+            end_key = end.isoformat() if end is not None else ""
             summary = str(event.get("SUMMARY", ""))
-            fingerprint_parts.append(f"{start}|{end}|{summary}")
+            fingerprint_parts.append(f"{start_key}|{end_key}|{summary}")
 
     fingerprint = hashlib.sha256("\n".join(fingerprint_parts).encode("utf-8")).hexdigest()
 
@@ -165,8 +201,9 @@ def build_week_view(week_offset):
 
         timed_events_info = []
         for event in timed_events:
-            start_h = clamp_hour(event["DTSTART"].dt)
-            end_h = clamp_hour(event["DTEND"].dt) if "DTEND" in event else min(start_h + 1, HOUR_END)
+            end = event_end(event)
+            start_h = clamp_hour(event_start(event))
+            end_h = clamp_hour(end) if end is not None else min(start_h + 1, HOUR_END)
             if end_h <= start_h:
                 end_h = min(start_h + 0.5, HOUR_END)
             timed_events_info.append({"event": event, "start_h": start_h, "end_h": end_h})
@@ -216,8 +253,9 @@ def build_week_view(week_offset):
             height = max((end_h - start_h) * HOUR_HEIGHT, 16)
             col_width_pct = 100 / total_cols
             left_pct = col * col_width_pct
-            start_label = event["DTSTART"].dt.strftime("%H:%M")
-            end_label = event["DTEND"].dt.strftime("%H:%M") if "DTEND" in event else ""
+            end = event_end(event)
+            start_label = event_start(event).strftime("%H:%M")
+            end_label = end.strftime("%H:%M") if end is not None else ""
             summary = str(event.get("SUMMARY", "Sin título"))
             events_html += f'''
             <div style="position:absolute; top:{top}px; height:{height}px; left:calc({left_pct}% + 1px); width:calc({col_width_pct}% - 2px);
@@ -292,12 +330,11 @@ def build_month_view(month_offset):
             is_friday = i == 4
             border_right = "border-right: 2px solid #000;" if is_friday else ("border-right: 1px solid #000;" if i < 6 else "")
 
-            events = query.at(date)
+            events = events_on(date)
             all_day_events = []
             timed_events = []
             for event in events:
-                all_day = isinstance(event["DTSTART"].dt, datetime.date) and not isinstance(event["DTSTART"].dt, datetime.datetime)
-                if all_day:
+                if is_all_day(event):
                     all_day_events.append(event)
                 else:
                     timed_events.append(event)
@@ -308,11 +345,12 @@ def build_month_view(month_offset):
             for event in all_day_events:
                 fingerprint_parts.append(f"A|{str(event.get('SUMMARY', ''))}")
             for event in timed_events:
-                start = event["DTSTART"].dt.isoformat()
+                start = event_start(event).isoformat()
                 summary = str(event.get("SUMMARY", ""))
                 fingerprint_parts.append(f"T|{start}|{summary}")
 
-            day_label = date.strftime("%-d de %b") if date.day == 1 else date.strftime("%-d")
+            # %-d no existe en strftime de Windows, por eso se usa date.day
+            day_label = f"{date.day} de {date.strftime('%b')}" if date.day == 1 else str(date.day)
 
             items_html = ""
             for event in all_day_events:
@@ -320,7 +358,7 @@ def build_month_view(month_offset):
                 items_html += f'<div style="background:#000; color:#fff; font-size:12px; line-height:13px; padding:0 2px; margin-bottom:1px; border-radius:1px; box-sizing:border-box; overflow:hidden; white-space:nowrap;">{summary}</div>'
             for event in timed_events:
                 summary = str(event.get("SUMMARY", "Sin título"))
-                start_label = event["DTSTART"].dt.strftime("%H:%M")
+                start_label = event_start(event).strftime("%H:%M")
                 items_html += f'<div style="font-size:12px; line-height:13px; color:#000; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">&bull; {start_label} {summary}</div>'
 
             rows_html += f'''
