@@ -1,4 +1,4 @@
-# Multi-calendar plugin for TRMNL with weekly and montlhy view
+# Multi-calendar plugin for TRMNL with weekly and monthly view
 
 A TRMNL plugin that merges one or more ICS calendars and pushes pre-rendered views
 sized for the 7.5" display (800×480): the current week, the next week and the full month.
