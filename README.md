@@ -23,3 +23,10 @@ TRMNL_NUMBER_COLUMNS=5
 ```
 5. Run `main.py`
 
+
+## Créditos
+
+Este proyecto es un fork de [jfsso/trmnl-calendar](https://github.com/jfsso/trmnl-calendar),
+publicado bajo licencia MIT. Ha evolucionado por separado, con soporte para varios
+calendarios de Google, actualización solo cuando hay cambios y adaptación a LaraPaper.
+Se conserva el aviso de copyright y la licencia originales (ver `LICENSE`).
